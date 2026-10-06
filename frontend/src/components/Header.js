@@ -9,6 +9,7 @@ const Header = () => {
       </div>
       <nav className="nav-links">
         <Link to="/">Home</Link>
+        <Link to="/menu">Menu</Link>
         <Link to="/dashboard">Dashboard</Link>
         <Link to="/login" className="btn" style={{ marginLeft: '1rem' }}>Login</Link>
       </nav>
