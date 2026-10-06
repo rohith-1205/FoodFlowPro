@@ -11,6 +11,16 @@ const Home = () => {
           Smart Restaurant Ordering & Management System
         </p>
         
+        {/* Added Search Section for UI improvement */}
+        <div style={{ marginBottom: '3rem' }}>
+          <input 
+            type="text" 
+            placeholder="Search for restaurants, cuisines, or dishes..." 
+            style={{ padding: '0.8rem 1rem', width: '60%', borderRadius: '4px', border: '1px solid #ccc', marginRight: '0.5rem' }}
+          />
+          <button className="btn">Search</button>
+        </div>
+        
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <div className="card" style={{ width: '250px' }}>
             <h3>Customer</h3>
