@@ -36,3 +36,7 @@ cd frontend
 npm install
 npm start
 ```
+
+## Current Development Status
+
+FoodFlow Pro is currently under active development.
