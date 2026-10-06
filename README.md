@@ -1,6 +1,6 @@
 # FoodFlow Pro - Smart Restaurant Ordering & Management System
 
-Welcome to the FoodFlow Pro project! This is a full-stack web application designed for a Software Engineering Assignment. It manages restaurant operations including ordering, kitchen management, delivery tracking, and user authentication across multiple roles.
+FoodFlow Pro is a comprehensive restaurant management and food ordering platform designed to streamline customer ordering, kitchen operations and delivery.
 
 ## Tech Stack
 * **Frontend:** React.js, Vanilla CSS
