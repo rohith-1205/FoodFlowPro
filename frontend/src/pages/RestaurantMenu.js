@@ -1,81 +1,158 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+
+const API = 'http://localhost:5000/api';
 
 const RestaurantMenu = () => {
-  const [activeCategory, setActiveCategory] = useState('All');
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { addToCart, cartItems, itemCount } = useCart();
+  const { user } = useAuth();
 
-  const restaurant = {
-    name: 'The Rustic Spatula',
-    description: 'Authentic Italian cuisine with a modern twist. Locally sourced ingredients and wood-fired pizzas.',
-    rating: 4.8,
-    deliveryTime: '25-40 min'
+  const [restaurant, setRestaurant] = useState(null);
+  const [menu, setMenu] = useState({});
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [instructionsModal, setInstructionsModal] = useState(null);
+  const [instructions, setInstructions] = useState('');
+
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const res = await fetch(`${API}/restaurants/${id}/menu`);
+        const data = await res.json();
+        setRestaurant(data.restaurant);
+        setMenu(data.menu);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenu();
+  }, [id]);
+
+  const categories = ['All', ...Object.keys(menu)];
+
+  const filteredItems = activeCategory === 'All'
+    ? Object.values(menu).flat()
+    : menu[activeCategory] || [];
+
+  const getCartQty = (itemId) => {
+    const found = cartItems.find(ci => ci._id === itemId);
+    return found ? found.quantity : 0;
   };
 
-  const menuItems = [
-    { id: 1, name: 'Margherita Pizza', category: 'Pizza', price: 14.99, description: 'Fresh mozzarella, San Marzano tomatoes, and basil on a wood-fired crust.' },
-    { id: 2, name: 'Truffle Mushroom Risotto', category: 'Mains', price: 19.50, description: 'Creamy Arborio rice with wild mushrooms, parmesan, and white truffle oil.' },
-    { id: 3, name: 'Calamari Fritti', category: 'Starters', price: 11.00, description: 'Crispy fried calamari served with a zesty marinara dipping sauce.' },
-    { id: 4, name: 'Tiramisu', category: 'Desserts', price: 8.50, description: 'Classic Italian dessert with espresso-soaked ladyfingers and mascarpone cream.' },
-    { id: 5, name: 'Pepperoni Pizza', category: 'Pizza', price: 16.99, description: 'Spicy pepperoni, mozzarella, and our signature tomato sauce.' },
-    { id: 6, name: 'Garlic Bread', category: 'Starters', price: 6.50, description: 'Toasted ciabatta with garlic butter and fresh herbs.' }
-  ];
+  const handleAddToCart = (item) => {
+    if (!user) { navigate('/login'); return; }
+    if (instructionsModal === null) {
+      setInstructionsModal(item);
+      setInstructions('');
+    }
+  };
 
-  const categories = ['All', 'Starters', 'Pizza', 'Mains', 'Desserts'];
+  const confirmAdd = () => {
+    addToCart({ ...instructionsModal, specialInstructions: instructions }, restaurant);
+    setInstructionsModal(null);
+    setInstructions('');
+  };
 
-  const filteredMenu = activeCategory === 'All' 
-    ? menuItems 
-    : menuItems.filter(item => item.category === activeCategory);
+  if (loading) return <div className="loading-center"><p>Loading menu...</p></div>;
+  if (!restaurant) return <div className="loading-center"><p>Restaurant not found.</p></div>;
 
   return (
     <div className="menu-page">
       {/* Restaurant Header */}
-      <div className="restaurant-header card" style={{ backgroundColor: 'var(--dark-color)', color: 'var(--light-color)', padding: '3rem 2rem', textAlign: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: 'var(--primary-color)' }}>{restaurant.name}</h2>
-        <p style={{ fontSize: '1.1rem', marginBottom: '1rem', maxWidth: '600px', margin: '0 auto 1rem auto' }}>
-          {restaurant.description}
-        </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', fontSize: '0.9rem', color: '#ccc' }}>
-          <span>⭐ {restaurant.rating} Rating</span>
-          <span>🛵 {restaurant.deliveryTime}</span>
+      <div className="restaurant-hero">
+        {restaurant.image && (
+          <img src={restaurant.image} alt={restaurant.name} className="restaurant-hero-img" />
+        )}
+        <div className="restaurant-hero-overlay">
+          <h1>{restaurant.name}</h1>
+          <p>{restaurant.cuisine} Cuisine</p>
+          <div className="restaurant-hero-meta">
+            <span>⭐ {restaurant.rating}</span>
+            <span>🕐 {restaurant.deliveryTime}</span>
+            <span>📍 {restaurant.address}</span>
+          </div>
         </div>
       </div>
 
-      {/* Categories */}
-      <div className="categories" style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem', marginBottom: '2rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-        {categories.map(category => (
-          <button 
-            key={category}
-            onClick={() => setActiveCategory(category)}
-            className="btn"
-            style={{ 
-              backgroundColor: activeCategory === category ? 'var(--primary-color)' : '#e0e0e0',
-              color: activeCategory === category ? 'white' : 'var(--text-color)',
-              borderRadius: '20px',
-              padding: '0.5rem 1.5rem',
-              transition: 'all 0.3s ease'
-            }}
+      {/* Category Pills */}
+      <div className="category-pills">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            className={`pill ${activeCategory === cat ? 'pill-active' : ''}`}
+            onClick={() => setActiveCategory(cat)}
           >
-            {category}
+            {cat}
           </button>
         ))}
       </div>
 
       {/* Menu Grid */}
-      <div className="menu-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-        {filteredMenu.map(item => (
-          <div key={item.id} className="card menu-item-card" style={{ display: 'flex', flexDirection: 'column', justifySelf: 'stretch', justifyContent: 'space-between', padding: '1.5rem', height: '100%' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                <h3 style={{ fontSize: '1.2rem', color: 'var(--dark-color)' }}>{item.name}</h3>
-                <span style={{ fontWeight: 'bold', color: 'var(--primary-color)', fontSize: '1.1rem' }}>${item.price.toFixed(2)}</span>
+      <div className="menu-grid">
+        {filteredItems.map(item => (
+          <div key={item._id} className={`menu-item-card ${!item.isAvailable ? 'unavailable' : ''}`}>
+            <div className="menu-item-body">
+              <div className="menu-item-info">
+                <span className="category-dot" />
+                <div>
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <span className="item-price">₹{item.price.toFixed(2)}</span>
+                </div>
               </div>
-              <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>{item.description}</p>
+              <div className="menu-item-action">
+                {!item.isAvailable ? (
+                  <span className="unavailable-label">Not Available</span>
+                ) : getCartQty(item._id) > 0 ? (
+                  <div className="qty-badge">In Cart: {getCartQty(item._id)}</div>
+                ) : null}
+                {item.isAvailable && (
+                  <button className="btn btn-add" onClick={() => handleAddToCart(item)}>
+                    + Add
+                  </button>
+                )}
+              </div>
             </div>
-            <button className="btn" style={{ width: '100%', padding: '0.8rem', marginTop: 'auto' }}>
-              Add to Cart
-            </button>
           </div>
         ))}
       </div>
+
+      {/* Floating Cart Button */}
+      {itemCount > 0 && (
+        <div className="floating-cart" onClick={() => navigate('/cart')}>
+          <span>🛒 {itemCount} item{itemCount > 1 ? 's' : ''}</span>
+          <span>View Cart →</span>
+        </div>
+      )}
+
+      {/* Special Instructions Modal */}
+      {instructionsModal && (
+        <div className="modal-overlay" onClick={() => setInstructionsModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Add to Cart</h3>
+            <p><strong>{instructionsModal.name}</strong> — ₹{instructionsModal.price.toFixed(2)}</p>
+            <div className="form-group" style={{ marginTop: '1rem' }}>
+              <label>Special Instructions (optional)</label>
+              <textarea
+                placeholder="E.g. No onions, extra spicy, less salt..."
+                value={instructions}
+                onChange={e => setInstructions(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button className="btn" onClick={confirmAdd}>Add to Cart</button>
+              <button className="btn btn-outline" onClick={() => setInstructionsModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

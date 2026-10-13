@@ -2,42 +2,69 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+require('dotenv').config();
 const connectDB = require('./config/db');
+const { protect, authorize } = require('./middleware/authMiddleware');
+const { promisify } = require('util');
+const execFile = promisify(require('child_process').execFile);
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const restaurantRoutes = require('./routes/restaurantRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] }
 });
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Connect to Database (Mocked for now)
-connectDB();
-
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/reviews', reviewRoutes);
 
-// Socket.io for Real-time communication
+// Seed route (for easy seeding via API)
+app.post('/api/seed', protect, authorize('admin'), async (req, res) => {
+  try {
+    await execFile(process.execPath, ['utils/seedData.js'], { cwd: __dirname });
+    res.json({ message: 'Database seeded successfully!' });
+  } catch (err) {
+    res.status(500).json({ message: 'Seeding failed', error: err.message });
+  }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'FoodFlow Pro API is running' });
+});
+
+// Socket.io - Real-time communication
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
-  
+
+  socket.on('join_room', (room) => {
+    socket.join(room);
+    console.log(`Socket ${socket.id} joined room: ${room}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
   });
 });
 
+// Expose io instance for use in other modules
+app.set('io', io);
+
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+connectDB().then(() => {
+  server.listen(PORT, () => {
+    console.log(`FoodFlow Pro Server running on port ${PORT}`);
+  });
 });
