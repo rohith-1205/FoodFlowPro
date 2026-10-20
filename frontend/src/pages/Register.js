@@ -2,11 +2,20 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const DEMO_ROLES = [
+  { role: 'customer', label: '🛒 Customer', color: '#4ecdc4' },
+  { role: 'waiter', label: '🍽️ Waiter', color: '#45b7d1' },
+  { role: 'kitchen', label: '👨‍🍳 Kitchen', color: '#f7b731' },
+  { role: 'delivery', label: '🛵 Delivery', color: '#fd9644' },
+  { role: 'manager', label: '📊 Manager', color: '#a55eea' },
+  { role: 'admin', label: '⚙️ Admin', color: '#fc5c65' },
+];
+
 const Register = () => {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, demoLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -20,6 +29,27 @@ const Register = () => {
       navigate('/');
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (role) => {
+    setError('');
+    setLoading(true);
+    try {
+      const data = await demoLogin(role);
+      const redirectMap = {
+        customer: '/',
+        waiter: '/dashboard',
+        kitchen: '/dashboard',
+        delivery: '/dashboard',
+        manager: '/dashboard',
+        admin: '/dashboard',
+      };
+      navigate(redirectMap[data.user.role] || '/');
+    } catch (err) {
+      setError(err.message || 'Demo login failed. Please seed the database first.');
     } finally {
       setLoading(false);
     }
@@ -56,6 +86,23 @@ const Register = () => {
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
+
+        <div className="auth-divider"><span>OR QUICK DEMO LOGIN</span></div>
+
+        <div className="demo-grid">
+          {DEMO_ROLES.map(({ role, label, color }) => (
+            <button
+              key={role}
+              type="button"
+              className="demo-btn"
+              style={{ borderColor: color, color: color }}
+              onClick={() => handleDemoLogin(role)}
+              disabled={loading}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <p className="auth-footer">
           Already have an account? <Link to="/login">Sign In</Link>

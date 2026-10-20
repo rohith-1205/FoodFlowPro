@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const connectDB = require('../config/db');
 
-const seedData = async () => {
+const seedData = async (shouldExit = false) => {
   await connectDB();
 
   // --- Users ---
@@ -117,10 +117,22 @@ const seedData = async () => {
   console.log('  manager@foodflow.com   | password123');
   console.log('  admin@foodflow.com     | password123');
 
-  process.exit(0);
+  if (shouldExit) {
+    process.exit(0);
+  }
+  return {
+    usersCount: users.length,
+    restaurantsCount: restaurants.length,
+    menuItemsCount: menuItems1.length + menuItems2.length,
+    tablesCount: tables.length
+  };
 };
 
-seedData().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  seedData(true).catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = seedData;

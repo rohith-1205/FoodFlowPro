@@ -25,6 +25,19 @@ const getRestaurants = async (req, res) => {
   }
 };
 
+const getRestaurantById = async (req, res) => {
+  try {
+    if (!require('mongoose').isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: 'Restaurant not found' });
+    }
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) return res.status(404).json({ message: 'Restaurant not found' });
+    res.json(restaurant);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const getRestaurantMenu = async (req, res) => {
   try {
     if (!require('mongoose').isValidObjectId(req.params.id)) {
@@ -48,4 +61,4 @@ const getRestaurantMenu = async (req, res) => {
   }
 };
 
-module.exports = { getRestaurants, getRestaurantMenu };
+module.exports = { getRestaurants, getRestaurantById, getRestaurantMenu };

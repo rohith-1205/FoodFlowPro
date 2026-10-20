@@ -6,7 +6,8 @@ const createReview = async (req, res) => {
   try {
     const { restaurantId, rating, comment } = req.body;
     if (!mongoose.isValidObjectId(restaurantId)) return res.status(400).json({ message: 'Invalid restaurant' });
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    const numRating = Number(rating);
+    if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
       return res.status(400).json({ message: 'Rating must be a whole number from 1 to 5' });
     }
     if (!(await Restaurant.exists({ _id: restaurantId }))) {
@@ -15,8 +16,8 @@ const createReview = async (req, res) => {
     const review = await Review.create({
       restaurantId,
       customerId: req.user._id,
-      rating,
-      comment
+      rating: numRating,
+      comment: comment || ''
     });
 
     // Update restaurant avg rating

@@ -50,39 +50,54 @@ const createOrder = async (req, res) => {
       });
     }
 
-    const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const rawSubtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = Number(rawSubtotal.toFixed(2));
     const taxAmount = Number((subtotal * 0.05).toFixed(2));
     const totalAmount = Number((subtotal + taxAmount).toFixed(2));
 
     if (orderType === 'dine-in') {
-      const table = await Table.findOne({ tableNumber, status: 'Available' });
-      if (!table) return res.status(400).json({ message: 'Table is unavailable' });
+      const tableNum = parseInt(tableNumber, 10);
+      if (isNaN(tableNum) || tableNum < 1) {
+        return res.status(400).json({ message: 'Valid table number required for dine-in' });
+      }
+      let table = await Table.findOne({ tableNumber: tableNum });
+      if (!table) {
+        if (tableNum <= 50) {
+          table = await Table.create({ tableNumber: tableNum, capacity: 4, status: 'Occupied' });
+        } else {
+          return res.status(400).json({ message: 'Table number must be between 1 and 50' });
+        }
+      }
     }
 
     const order = await Order.create({
       customerId: req.user._id,
       restaurantId,
       orderType,
-      tableNumber: orderType === 'dine-in' ? tableNumber : undefined,
+      tableNumber: orderType === 'dine-in' ? parseInt(tableNumber, 10) : undefined,
       deliveryAddress: orderType === 'delivery' ? deliveryAddress : undefined,
       items: orderItems,
       subtotal: Number(subtotal.toFixed(2)),
       taxAmount,
       totalAmount,
       paymentMethod,
+      paymentStatus: paymentMethod === 'Cash' ? 'Pending' : 'Paid',
       specialInstructions
     });
 
     // Update table status for dine-in
     if (orderType === 'dine-in' && tableNumber) {
-      const table = await Table.findOneAndUpdate(
-        { tableNumber, status: 'Available' },
+      await Table.findOneAndUpdate(
+        { tableNumber: parseInt(tableNumber, 10) },
         { status: 'Occupied', currentOrderId: order._id }
       );
-      if (!table) {
-        await Order.findByIdAndDelete(order._id);
-        return res.status(400).json({ message: 'Table is unavailable' });
-      }
+    }
+
+    // Emit real-time notification if socket is available
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('new_order', order);
+      io.to(`restaurant_${restaurantId}`).emit('order_created', order);
     }
 
     res.status(201).json(order);
@@ -94,7 +109,7 @@ const createOrder = async (req, res) => {
 const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ customerId: req.user._id })
-      .populate('restaurantId', 'name cuisine image')
+      .populate('restaurantId', 'name cuisine image address')
       .sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
@@ -110,7 +125,7 @@ const getOrderById = async (req, res) => {
       .populate('customerId', 'name email phone');
     if (!order) return res.status(404).json({ message: 'Order not found' });
     const staffRoles = ['waiter', 'kitchen', 'delivery', 'manager', 'admin'];
-    if (String(order.customerId._id) !== String(req.user._id) && !staffRoles.includes(req.user.role)) {
+    if (String(order.customerId?._id) !== String(req.user._id) && !staffRoles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Not authorized to view this order' });
     }
     res.json(order);
@@ -119,4 +134,13 @@ const getOrderById = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getMyOrders, getOrderById };
+const getTables = async (req, res) => {
+  try {
+    const tables = await Table.find().sort({ tableNumber: 1 });
+    res.json(tables);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { createOrder, getMyOrders, getOrderById, getTables };

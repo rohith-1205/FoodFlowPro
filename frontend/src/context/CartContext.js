@@ -67,9 +67,10 @@ export const CartProvider = ({ children }) => {
     setCart({ items: [], restaurantId: null, restaurantName: '' });
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * TAX_RATE;
-  const total = subtotal + tax;
+  const rawSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = Number(rawSubtotal.toFixed(2));
+  const tax = Number((subtotal * TAX_RATE).toFixed(2));
+  const total = Number((subtotal + tax).toFixed(2));
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (

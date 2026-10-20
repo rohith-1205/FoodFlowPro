@@ -10,6 +10,7 @@ const CustomerOrders = () => {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [reviewError, setReviewError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [savingReview, setSavingReview] = useState(false);
 
   useEffect(() => {
@@ -30,14 +31,17 @@ const CustomerOrders = () => {
     setSavingReview(true);
     setReviewError('');
     try {
+      const targetRestaurantId = reviewOrder.restaurantId?._id || reviewOrder.restaurantId;
       const response = await authFetch('/reviews', {
         method: 'POST',
-        body: JSON.stringify({ restaurantId: reviewOrder.restaurantId._id, rating, comment })
+        body: JSON.stringify({ restaurantId: targetRestaurantId, rating: Number(rating), comment: comment.trim() })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Could not submit review');
       setReviewOrder(null);
       setComment('');
+      setSuccessMsg(`Review for "${reviewOrder.restaurantId?.name || 'Restaurant'}" posted successfully! ⭐`);
+      setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err) {
       setReviewError(err.message);
     } finally {
@@ -58,8 +62,20 @@ const CustomerOrders = () => {
         <span className="order-count">{orders.length} {orders.length === 1 ? 'order' : 'orders'}</span>
       </div>
 
+      {successMsg && (
+        <div className="alert" style={{ background: '#e5f5eb', color: '#176247', border: '1px solid #c3e6cb', margin: '1rem 0' }}>
+          {successMsg}
+        </div>
+      )}
+
       {orders.length === 0 ? (
-        <div className="empty-state"><h2>No orders yet</h2><p>Your next favorite meal is a few taps away.</p></div>
+        <div className="empty-state">
+          <h2>No orders yet</h2>
+          <p>Your next favorite meal is a few taps away.</p>
+          <button type="button" className="btn" style={{ marginTop: '1rem' }} onClick={() => window.location.href = '/'}>
+            Browse Restaurants
+          </button>
+        </div>
       ) : (
         <div className="orders-list">
           {orders.map(order => (

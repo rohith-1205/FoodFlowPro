@@ -13,6 +13,8 @@ const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const seedData = require('./utils/seedData');
+const Table = require('./models/Table');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,11 +32,21 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/reviews', reviewRoutes);
 
-// Seed route (for easy seeding via API)
-app.post('/api/seed', protect, authorize('admin'), async (req, res) => {
+// Tables route
+app.get('/api/tables', async (req, res) => {
   try {
-    await execFile(process.execPath, ['utils/seedData.js'], { cwd: __dirname });
-    res.json({ message: 'Database seeded successfully!' });
+    const tables = await Table.find().sort({ tableNumber: 1 });
+    res.json(tables);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch tables', error: err.message });
+  }
+});
+
+// Seed route (for easy seeding via GET or POST)
+app.all('/api/seed', async (req, res) => {
+  try {
+    const summary = await seedData(false);
+    res.json({ message: 'Database seeded successfully!', summary });
   } catch (err) {
     res.status(500).json({ message: 'Seeding failed', error: err.message });
   }
