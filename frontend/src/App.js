@@ -9,14 +9,20 @@ import Register from './pages/Register';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import CustomerOrders from './pages/CustomerOrders';
+import KitchenDashboard from './pages/KitchenDashboard';
+import WaiterDashboard from './pages/WaiterDashboard';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="loading-center">Restoring your session...</div>;
-  return user ? children : <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
 };
 
 function App() {
@@ -36,6 +42,22 @@ function App() {
                 <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
                 <Route path="/my-orders" element={<ProtectedRoute><CustomerOrders /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route
+                  path="/kitchen"
+                  element={
+                    <ProtectedRoute allowedRoles={['kitchen', 'manager', 'admin']}>
+                      <KitchenDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/waiter"
+                  element={
+                    <ProtectedRoute allowedRoles={['waiter', 'manager', 'admin']}>
+                      <WaiterDashboard />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<Home />} />
               </Routes>
             </main>

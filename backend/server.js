@@ -13,6 +13,8 @@ const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const kitchenRoutes = require('./routes/kitchenRoutes');
+const waiterRoutes = require('./routes/waiterRoutes');
 const seedData = require('./utils/seedData');
 const Table = require('./models/Table');
 
@@ -31,6 +33,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/waiter', waiterRoutes);
 
 // Tables route
 app.get('/api/tables', async (req, res) => {

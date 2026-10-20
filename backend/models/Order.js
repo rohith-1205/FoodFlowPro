@@ -25,7 +25,9 @@ const orderSchema = new mongoose.Schema({
   },
   paymentStatus: { type: String, enum: ['Pending', 'Paid', 'Failed'], default: 'Pending' },
   paymentMethod: { type: String, enum: ['Card', 'UPI', 'Cash'] },
-  specialInstructions: { type: String, default: '' }
+  specialInstructions: { type: String, default: '' },
+  isServed: { type: Boolean, default: false },
+  servedAt: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', orderSchema);

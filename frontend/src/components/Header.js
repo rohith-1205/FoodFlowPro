@@ -17,6 +17,12 @@ const Header = () => {
       <nav className="nav-links">
         <Link to="/">Home</Link>
         {user && user.role === 'customer' && <Link to="/my-orders">My orders</Link>}
+        {user && ['kitchen', 'manager', 'admin'].includes(user.role) && (
+          <Link to="/kitchen">Kitchen KDS</Link>
+        )}
+        {user && ['waiter', 'manager', 'admin'].includes(user.role) && (
+          <Link to="/waiter">Waiter Service</Link>
+        )}
         {user && user.role !== 'customer' && <Link to="/dashboard">Dashboard</Link>}
         <Link to="/cart" className="header-cart" aria-label={`Cart, ${itemCount} items`}>
           <ShoppingCart size={19} />

@@ -50,8 +50,8 @@ const Login = () => {
   const redirectByRole = (role) => {
     const redirectMap = {
       customer: '/',
-      waiter: '/dashboard',
-      kitchen: '/dashboard',
+      waiter: '/waiter',
+      kitchen: '/kitchen',
       delivery: '/dashboard',
       manager: '/dashboard',
       admin: '/dashboard',

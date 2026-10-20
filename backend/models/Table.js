@@ -8,6 +8,8 @@ const tableSchema = new mongoose.Schema({
     enum: ['Available', 'Occupied', 'Reserved'],
     default: 'Available'
   },
+  foodReady: { type: Boolean, default: false },
+  billRequested: { type: Boolean, default: false },
   currentOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null }
 }, { timestamps: true });
 
