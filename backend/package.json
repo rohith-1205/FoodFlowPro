@@ -7,9 +7,10 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed": "node utils/seedData.js",
-    "test": "node -e \"require('./test_suite.js'); setTimeout(() => { require('./test_dev2_suite.js'); setTimeout(() => { require('./test_dev3_suite.js'); }, 1200); }, 1200);\"",
+    "test": "node run_all_tests.js",
     "test:dev2": "node test_dev2_suite.js",
-    "test:dev3": "node test_dev3_suite.js"
+    "test:dev3": "node test_dev3_suite.js",
+    "test:dev4": "node test_dev4_suite.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

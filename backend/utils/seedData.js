@@ -3,6 +3,10 @@ const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 const MenuItem = require('../models/MenuItem');
 const Table = require('../models/Table');
+const Order = require('../models/Order');
+const Delivery = require('../models/Delivery');
+const Review = require('../models/Review');
+const Dispute = require('../models/Dispute');
 require('dotenv').config();
 
 const connectDB = require('../config/db');
@@ -108,6 +112,54 @@ const seedData = async (shouldExit = false) => {
   }
   console.log(`Seeded ${tables.length} tables`);
 
+  // --- Sample Disputes ---
+  const customerUser = users.find(u => u.role === 'customer');
+  const demoDisputes = [
+    {
+      customerId: customerUser._id,
+      restaurantId: rusticSpatula._id,
+      issueType: 'Quality Complaint',
+      description: 'Margherita Pizza was slightly cold when it arrived via delivery.',
+      status: 'Open',
+      refundAmount: 0
+    },
+    {
+      customerId: customerUser._id,
+      restaurantId: spiceGarden._id,
+      issueType: 'Refund Request',
+      description: 'Customer requested refund for duplicate order charged on card.',
+      status: 'Under Review',
+      refundAmount: 18.50,
+      resolutionNotes: 'Bank statement verification in progress'
+    },
+    {
+      customerId: customerUser._id,
+      restaurantId: rusticSpatula._id,
+      issueType: 'Delivery Delay',
+      description: 'Order took 55 minutes instead of estimated 30-40 min during peak dinner rush.',
+      status: 'Resolved',
+      refundAmount: 5.00,
+      resolutionNotes: 'Issued $5 credit voucher to customer wallet.'
+    }
+  ];
+
+  for (const d of demoDisputes) {
+    const existing = await Dispute.findOne({ description: d.description });
+    if (!existing) await Dispute.create(d);
+  }
+  console.log('Seeded sample disputes');
+
+  // --- Sample Reviews ---
+  const demoReviews = [
+    { restaurantId: rusticSpatula._id, customerId: customerUser._id, rating: 5, comment: 'Phenomenal Margherita pizza! Authentic crust and fast service.' },
+    { restaurantId: spiceGarden._id, customerId: customerUser._id, rating: 4, comment: 'Rich and creamy Butter Chicken, really enjoyed the Garlic Naan.' }
+  ];
+  for (const r of demoReviews) {
+    const existing = await Review.findOne({ restaurantId: r.restaurantId, comment: r.comment });
+    if (!existing) await Review.create(r);
+  }
+  console.log('Seeded sample reviews');
+
   console.log('\n✅ Database seeded successfully!');
   console.log('\n📋 Demo Login Credentials:');
   console.log('  customer@foodflow.com  | password123');
@@ -124,7 +176,8 @@ const seedData = async (shouldExit = false) => {
     usersCount: users.length,
     restaurantsCount: restaurants.length,
     menuItemsCount: menuItems1.length + menuItems2.length,
-    tablesCount: tables.length
+    tablesCount: tables.length,
+    disputesCount: demoDisputes.length
   };
 };
 

@@ -16,6 +16,8 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const kitchenRoutes = require('./routes/kitchenRoutes');
 const waiterRoutes = require('./routes/waiterRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
+const managerRoutes = require('./routes/managerRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const seedData = require('./utils/seedData');
 const Table = require('./models/Table');
 const { setupSocketIO } = require('./socket');
@@ -38,6 +40,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/kitchen', kitchenRoutes);
 app.use('/api/waiter', waiterRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/manager', managerRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Tables route
 app.get('/api/tables', async (req, res) => {
