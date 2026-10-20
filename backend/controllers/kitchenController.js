@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Table = require('../models/Table');
+const Delivery = require('../models/Delivery');
+const Restaurant = require('../models/Restaurant');
+const { socketHelpers } = require('../socket');
 
 // Helper to calculate elapsed time
 const calculateElapsedTime = (createdAt) => {
@@ -100,6 +103,36 @@ const updateOrderStatus = async (req, res) => {
     // Emit real-time socket events
     const io = req.app.get('io');
     if (io) {
+      // Developer 3 socket room broadcasts
+      socketHelpers.broadcastOrderStatusUpdate(io, order);
+
+      if (status === 'Ready') {
+        if (order.orderType === 'delivery') {
+          let delivery = await Delivery.findOne({ orderId: order._id });
+          if (!delivery) {
+            const restaurant = await Restaurant.findById(order.restaurantId);
+            delivery = await Delivery.create({
+              orderId: order._id,
+              status: 'Available',
+              pickupAddress: restaurant ? restaurant.address : 'Restaurant Kitchen',
+              deliveryAddress: order.deliveryAddress,
+              customerPhone: '',
+              currentCoordinates: { lat: 12.9716, lng: 77.5946 }
+            });
+          }
+          socketHelpers.broadcastReadyForDelivery(io, order, delivery);
+        } else if (order.orderType === 'dine-in') {
+          socketHelpers.broadcastTableReady(io, {
+            orderId: order._id,
+            tableNumber: order.tableNumber,
+            orderType: order.orderType,
+            items: order.items,
+            table: updatedTable
+          });
+        }
+      }
+
+      // Backward compatible legacy events
       io.emit('order_status_updated', order);
       io.emit('kitchen_order_updated', order);
       if (status === 'Ready') {

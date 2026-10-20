@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const CustomerOrders = () => {
@@ -98,9 +99,14 @@ const CustomerOrders = () => {
               <div className="order-card-footer">
                 <span>{order.paymentMethod} · {order.paymentStatus}</span>
                 <strong>₹{order.totalAmount.toFixed(2)}</strong>
-                <button className="btn btn-outline" onClick={() => { setReviewOrder(order); setReviewError(''); }}>
-                  Rate &amp; Review
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <Link to={`/track/${order._id}`} className="btn" style={{ padding: '0.42rem 0.85rem', fontSize: '0.84rem' }}>
+                    Track Live 🛵
+                  </Link>
+                  <button className="btn btn-outline" style={{ padding: '0.42rem 0.85rem', fontSize: '0.84rem' }} onClick={() => { setReviewOrder(order); setReviewError(''); }}>
+                    Rate &amp; Review
+                  </button>
+                </div>
               </div>
             </article>
           ))}

@@ -2,6 +2,8 @@ const Order = require('../models/Order');
 const Table = require('../models/Table');
 const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
+const Delivery = require('../models/Delivery');
+const { socketHelpers } = require('../socket');
 const mongoose = require('mongoose');
 
 const createOrder = async (req, res) => {
@@ -93,11 +95,28 @@ const createOrder = async (req, res) => {
       );
     }
 
-    // Emit real-time notification if socket is available
+    // Create Delivery tracking record for delivery orders
+    if (orderType === 'delivery') {
+      try {
+        await Delivery.create({
+          orderId: order._id,
+          deliveryBoyId: null,
+          status: 'Available',
+          pickupAddress: restaurant.address || 'Restaurant Kitchen',
+          deliveryAddress: deliveryAddress.trim(),
+          customerPhone: req.user.phone || '',
+          currentCoordinates: { lat: 12.9716, lng: 77.5946 },
+          estimatedDeliveryMinutes: 35
+        });
+      } catch (delErr) {
+        console.error('Failed to auto-create delivery document:', delErr.message);
+      }
+    }
+
+    // Emit real-time notifications
     const io = req.app.get('io');
     if (io) {
-      io.emit('new_order', order);
-      io.to(`restaurant_${restaurantId}`).emit('order_created', order);
+      socketHelpers.broadcastOrderCreated(io, order);
     }
 
     res.status(201).json(order);

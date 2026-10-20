@@ -15,8 +15,10 @@ const restaurantRoutes = require('./routes/restaurantRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const kitchenRoutes = require('./routes/kitchenRoutes');
 const waiterRoutes = require('./routes/waiterRoutes');
+const deliveryRoutes = require('./routes/deliveryRoutes');
 const seedData = require('./utils/seedData');
 const Table = require('./models/Table');
+const { setupSocketIO } = require('./socket');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +37,7 @@ app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/kitchen', kitchenRoutes);
 app.use('/api/waiter', waiterRoutes);
+app.use('/api/delivery', deliveryRoutes);
 
 // Tables route
 app.get('/api/tables', async (req, res) => {
@@ -61,19 +64,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'FoodFlow Pro API is running' });
 });
 
-// Socket.io - Real-time communication
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-
-  socket.on('join_room', (room) => {
-    socket.join(room);
-    console.log(`Socket ${socket.id} joined room: ${room}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-  });
-});
+// Socket.io - Real-time communication & rooms
+setupSocketIO(io);
 
 // Expose io instance for use in other modules
 app.set('io', io);

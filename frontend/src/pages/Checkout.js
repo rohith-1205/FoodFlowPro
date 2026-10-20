@@ -83,7 +83,8 @@ const Checkout = () => {
       if (!res.ok) throw new Error(data.message || 'Failed to place order');
 
       clearCart();
-      setSuccess(data);
+      // Redirect directly to live order tracking page
+      navigate(`/track/${data._id}`);
     } catch (err) {
       setError(err.message);
     } finally {
