@@ -101,7 +101,7 @@ const CustomerOrders = () => {
                 <strong>₹{order.totalAmount.toFixed(2)}</strong>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <Link to={`/track/${order._id}`} className="btn" style={{ padding: '0.42rem 0.85rem', fontSize: '0.84rem' }}>
-                    Track Live 🛵
+                    {order.orderType === 'dine-in' ? 'Table Status 🍽️' : 'Track Live 🛵'}
                   </Link>
                   <button className="btn btn-outline" style={{ padding: '0.42rem 0.85rem', fontSize: '0.84rem' }} onClick={() => { setReviewOrder(order); setReviewError(''); }}>
                     Rate &amp; Review

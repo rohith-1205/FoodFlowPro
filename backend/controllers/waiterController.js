@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Table = require('../models/Table');
 const MenuItem = require('../models/MenuItem');
 const Restaurant = require('../models/Restaurant');
+const { socketHelpers } = require('../socket');
 
 /**
  * Ensure default tables 1-10 exist in database
@@ -235,6 +236,7 @@ const serveOrder = async (req, res) => {
 
     order.isServed = true;
     order.servedAt = new Date();
+    order.status = 'Delivered';
     await order.save();
 
     // Reset foodReady on the Table
@@ -250,14 +252,16 @@ const serveOrder = async (req, res) => {
     // Emit real-time socket events
     const io = req.app.get('io');
     if (io) {
+      socketHelpers.broadcastOrderStatusUpdate(io, order, { isServed: true });
       io.emit('order_served', order);
+      io.emit('order_status_updated', order);
       if (table) {
         io.emit('table_updated', table);
       }
     }
 
     res.json({
-      message: `Order #${order._id.toString().slice(-4).toUpperCase()} marked as served to Table ${order.tableNumber}`,
+      message: `Order #${order._id.toString().slice(-4).toUpperCase()} served to Table ${order.tableNumber} and completed as delivered`,
       order,
       table
     });
@@ -407,10 +411,12 @@ const settleTable = async (req, res) => {
     // Emit real-time events
     const io = req.app.get('io');
     if (io) {
-      io.emit('table_settled', { tableNumber, orderId: order ? order._id : null });
       if (order) {
+        socketHelpers.broadcastOrderStatusUpdate(io, order, { isServed: true, paymentStatus: 'Paid' });
         io.emit('order_completed', order);
+        io.emit('order_status_updated', order);
       }
+      io.emit('table_settled', { tableNumber, orderId: order ? order._id : null });
       io.emit('table_updated', table);
     }
 
