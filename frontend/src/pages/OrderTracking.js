@@ -68,6 +68,23 @@ const OrderTracking = () => {
       const data = await res.json();
       setOrder(data);
 
+      const isDelivered = data.status === 'Delivered' || (data.orderType === 'dine-in' && data.isServed);
+      if (isDelivered) {
+        setTripProgress(100);
+        setSpeed(0);
+        setCurrentCoords(CUSTOMER_DEFAULT);
+        setIsLivePingActive(false);
+      } else if (data.status === 'Out for Delivery') {
+        setTripProgress(50);
+        setSpeed(30);
+      } else if (data.status === 'Ready') {
+        setTripProgress(20);
+        setSpeed(0);
+      } else {
+        setTripProgress(5);
+        setSpeed(0);
+      }
+
       // Fetch delivery details strictly if delivery order
       if (data.orderType === 'delivery') {
         try {
@@ -76,7 +93,12 @@ const OrderTracking = () => {
             const delData = await delRes.json();
             if (delData) {
               setDelivery(delData);
-              if (delData.currentCoordinates?.lat) {
+              if (isDelivered || delData.status === 'Delivered') {
+                setCurrentCoords(CUSTOMER_DEFAULT);
+                setTripProgress(100);
+                setSpeed(0);
+                setIsLivePingActive(false);
+              } else if (delData.currentCoordinates?.lat) {
                 setCurrentCoords(delData.currentCoordinates);
               }
             }
@@ -111,18 +133,21 @@ const OrderTracking = () => {
       if (!payload) return;
       const targetId = payload.orderId || payload.order?._id || payload._id;
       if (String(targetId) === String(orderId)) {
+        const nextStatus = payload.status || payload.order?.status || payload.delivery?.status;
+        const isDelivered = nextStatus === 'Delivered';
+
         if (payload.order) {
           setOrder((prev) => ({
             ...prev,
             ...payload.order,
-            status: payload.status || payload.order.status,
-            isServed: payload.order.isServed !== undefined ? payload.order.isServed : prev?.isServed
+            status: nextStatus || prev?.status,
+            isServed: payload.order.isServed !== undefined ? payload.order.isServed : (isDelivered || prev?.isServed)
           }));
-        } else if (payload.status) {
+        } else if (nextStatus) {
           setOrder((prev) => (prev ? {
             ...prev,
-            status: payload.status,
-            isServed: payload.status === 'Delivered' || payload.isServed ? true : prev.isServed
+            status: nextStatus,
+            isServed: isDelivered ? true : prev.isServed
           } : null));
         }
 
@@ -130,10 +155,18 @@ const OrderTracking = () => {
           setDelivery(payload.delivery);
         }
 
+        // When order or delivery status transitions to Delivered, lock GPS telemetry to 100% arrival
+        if (isDelivered) {
+          setTripProgress(100);
+          setSpeed(0);
+          setCurrentCoords(CUSTOMER_DEFAULT);
+          setIsLivePingActive(false);
+        }
+
         const isDineInOrder = order?.orderType === 'dine-in' || payload.order?.orderType === 'dine-in';
-        const displayStatusText = (isDineInOrder && (payload.status === 'Delivered' || payload.isServed))
+        const displayStatusText = (isDineInOrder && (nextStatus === 'Delivered' || payload.isServed))
           ? 'Served to Table'
-          : (payload.status || 'Updated');
+          : (nextStatus || 'Updated');
 
         showToast({
           title: `Order Update: ${displayStatusText} 🔔`,
@@ -141,7 +174,7 @@ const OrderTracking = () => {
             ? 'Your food has been served to your table by the waiter!'
             : `Your order status changed to "${displayStatusText}".`,
           type: 'info',
-          soundType: payload.status === 'Ready' || payload.status === 'Delivered' ? 'ready' : 'notification'
+          soundType: nextStatus === 'Ready' || nextStatus === 'Delivered' ? 'ready' : 'notification'
         });
       }
     };
@@ -149,12 +182,22 @@ const OrderTracking = () => {
     // Handle live GPS coordinates ping (only relevant for delivery orders)
     const handleLocationPing = (payload) => {
       if (!payload || String(payload.orderId) !== String(orderId)) return;
+      
+      // If delivery is already complete or ping says 100%, pin to destination drop-off
+      if (payload.progress >= 100) {
+        setCurrentCoords(CUSTOMER_DEFAULT);
+        setTripProgress(100);
+        setSpeed(0);
+        setIsLivePingActive(false);
+        return;
+      }
+
       if (payload.coordinates?.lat && payload.coordinates?.lng) {
         setCurrentCoords(payload.coordinates);
         setIsLivePingActive(true);
         setLastPingTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
-        if (payload.speed) setSpeed(payload.speed);
+        if (payload.speed !== undefined) setSpeed(payload.speed);
         if (payload.progress !== undefined) {
           setTripProgress(Math.min(100, Math.max(0, payload.progress)));
         } else {
@@ -194,6 +237,7 @@ const OrderTracking = () => {
     };
 
     socket.on('order:status_update', handleStatusUpdate);
+    socket.on('delivery:status_update', handleStatusUpdate);
     socket.on('delivery:location_ping', handleLocationPing);
     socket.on('delivery:location_update', handleLocationPing);
     socket.on('delivery:assigned', handleDeliveryAssigned);
@@ -201,6 +245,7 @@ const OrderTracking = () => {
 
     return () => {
       socket.off('order:status_update', handleStatusUpdate);
+      socket.off('delivery:status_update', handleStatusUpdate);
       socket.off('delivery:location_ping', handleLocationPing);
       socket.off('delivery:location_update', handleLocationPing);
       socket.off('delivery:assigned', handleDeliveryAssigned);
@@ -465,17 +510,27 @@ const OrderTracking = () => {
             <div className="live-map-card">
               <div className="map-card-header">
                 <div className="map-title-row">
-                  <span className="live-radar-dot" />
-                  <strong>Live Delivery GPS Route</strong>
-                  {isLivePingActive && (
+                  <span
+                    className="live-radar-dot"
+                    style={currentStatus === 'Delivered' ? { backgroundColor: '#10b981', boxShadow: '0 0 10px rgba(16, 185, 129, 0.7)' } : undefined}
+                  />
+                  <strong>{currentStatus === 'Delivered' ? 'Delivery Completed Route' : 'Live Delivery GPS Route'}</strong>
+                  {currentStatus === 'Delivered' ? (
+                    <span className="live-signal-badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                      ✔ Trip Complete • Delivered to Doorstep
+                    </span>
+                  ) : isLivePingActive ? (
                     <span className="live-signal-badge">
                       ⚡ Live GPS Feed Active {lastPingTime ? `(${lastPingTime})` : ''}
                     </span>
-                  )}
+                  ) : null}
                 </div>
-                <span className="eta-pill">
+                <span
+                  className="eta-pill"
+                  style={currentStatus === 'Delivered' ? { color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' } : undefined}
+                >
                   <Clock size={14} />
-                  {currentStatus === 'Delivered' ? 'Delivered' : `Trip ~${tripProgress}% Complete`}
+                  {currentStatus === 'Delivered' ? 'Delivered 🎉' : `Trip ~${tripProgress}% Complete`}
                 </span>
               </div>
 
@@ -514,6 +569,7 @@ const OrderTracking = () => {
                   <rect x="160" y="100" width="70" height="80" rx="10" fill="#1c3831" />
                   <text x="180" y="145" fill="#4fa896" fontSize="12" fontWeight="700">PARK</text>
 
+                  {/* Road Base Track */}
                   <path
                     d="M 80,90 Q 200,80 250,150 T 500,230"
                     fill="none"
@@ -521,15 +577,29 @@ const OrderTracking = () => {
                     strokeWidth="16"
                     strokeLinecap="round"
                   />
-                  <path
-                    d="M 80,90 Q 200,80 250,150 T 500,230"
-                    fill="none"
-                    stroke="url(#roadGrad)"
-                    strokeWidth="5"
-                    strokeDasharray="6 6"
-                    className="animated-dash-line"
-                  />
 
+                  {/* Road Active vs Completed Path */}
+                  {currentStatus === 'Delivered' ? (
+                    <path
+                      d="M 80,90 Q 200,80 250,150 T 500,230"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      opacity="0.95"
+                    />
+                  ) : (
+                    <path
+                      d="M 80,90 Q 200,80 250,150 T 500,230"
+                      fill="none"
+                      stroke="url(#roadGrad)"
+                      strokeWidth="5"
+                      strokeDasharray="6 6"
+                      className="animated-dash-line"
+                    />
+                  )}
+
+                  {/* Restaurant Origin Node */}
                   <g transform="translate(80, 90)">
                     <circle r="18" fill="#2d796c" />
                     <circle r="24" fill="none" stroke="#2d796c" strokeWidth="1.5" opacity="0.6" />
@@ -540,18 +610,50 @@ const OrderTracking = () => {
                     </text>
                   </g>
 
+                  {/* Destination Drop Node */}
                   <g transform="translate(500, 230)">
-                    <circle r="36" fill="url(#destPulse)" className="dest-pulse-anim" />
-                    <circle r="18" fill="#d94f37" />
-                    <circle r="24" fill="none" stroke="#d94f37" strokeWidth="1.5" opacity="0.6" />
-                    <text x="0" y="5" textAnchor="middle" fontSize="14" fill="#ffffff">🏠</text>
-                    <rect x="-45" y="-36" width="90" height="22" rx="4" fill="rgba(0,0,0,0.75)" />
-                    <text x="0" y="-22" textAnchor="middle" fontSize="10" fontWeight="700" fill="#ffffff">
-                      YOU (DROP)
-                    </text>
+                    {currentStatus === 'Delivered' ? (
+                      <>
+                        <circle r="36" fill="rgba(16, 185, 129, 0.25)" />
+                        <circle r="20" fill="#10b981" />
+                        <circle r="26" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.8" />
+                        <text x="0" y="6" textAnchor="middle" fontSize="14" fill="#ffffff">🏠</text>
+                        <rect x="-55" y="-38" width="110" height="24" rx="4" fill="rgba(6, 95, 70, 0.95)" stroke="#10b981" strokeWidth="1" />
+                        <text x="0" y="-22" textAnchor="middle" fontSize="10" fontWeight="800" fill="#ffffff">
+                          ✔ DELIVERED HERE
+                        </text>
+                      </>
+                    ) : (
+                      <>
+                        <circle r="36" fill="url(#destPulse)" className="dest-pulse-anim" />
+                        <circle r="18" fill="#d94f37" />
+                        <circle r="24" fill="none" stroke="#d94f37" strokeWidth="1.5" opacity="0.6" />
+                        <text x="0" y="5" textAnchor="middle" fontSize="14" fill="#ffffff">🏠</text>
+                        <rect x="-45" y="-36" width="90" height="22" rx="4" fill="rgba(0,0,0,0.75)" />
+                        <text x="0" y="-22" textAnchor="middle" fontSize="10" fontWeight="700" fill="#ffffff">
+                          YOU (DROP)
+                        </text>
+                      </>
+                    )}
                   </g>
 
+                  {/* Vehicle / Package Marker */}
                   {(() => {
+                    const isDelivered = currentStatus === 'Delivered';
+                    if (isDelivered) {
+                      return (
+                        <g transform="translate(500, 230)" className="vehicle-group">
+                          <circle r="28" fill="rgba(16, 185, 129, 0.3)" />
+                          <circle r="14" fill="#10b981" />
+                          <text x="0" y="4" textAnchor="middle" fontSize="12">📦</text>
+                          <rect x="-45" y="24" width="90" height="20" rx="4" fill="rgba(0,0,0,0.85)" stroke="#10b981" strokeWidth="1" />
+                          <text x="0" y="38" textAnchor="middle" fontSize="9" fontWeight="800" fill="#10b981">
+                            ARRIVED • 0 km/h
+                          </text>
+                        </g>
+                      );
+                    }
+
                     const t = Math.max(0.05, Math.min(0.95, tripProgress / 100));
                     const x = 80 + (500 - 80) * t;
                     const y = 90 + (230 - 90) * t - Math.sin(t * Math.PI) * 40;
@@ -567,6 +669,16 @@ const OrderTracking = () => {
                       </g>
                     );
                   })()}
+
+                  {/* Top Celebration Banner on Canvas when Delivered */}
+                  {currentStatus === 'Delivered' && (
+                    <g transform="translate(300, 32)">
+                      <rect x="-145" y="-14" width="290" height="28" rx="14" fill="rgba(16, 185, 129, 0.95)" stroke="#34d399" strokeWidth="1" />
+                      <text x="0" y="5" textAnchor="middle" fontSize="11" fontWeight="800" fill="#ffffff" letterSpacing="0.06em">
+                        🎉 ORDER DELIVERED AT DOORSTEP 🎉
+                      </text>
+                    </g>
+                  )}
                 </svg>
               </div>
 
@@ -575,37 +687,52 @@ const OrderTracking = () => {
                 <div className="telemetry-item">
                   <span className="telemetry-label">Vehicle Coordinates</span>
                   <strong className="telemetry-value">
-                    {currentCoords.lat.toFixed(4)}°N, {currentCoords.lng.toFixed(4)}°E
+                    {currentStatus === 'Delivered'
+                      ? `${CUSTOMER_DEFAULT.lat.toFixed(4)}°N, ${CUSTOMER_DEFAULT.lng.toFixed(4)}°E`
+                      : `${currentCoords.lat.toFixed(4)}°N, ${currentCoords.lng.toFixed(4)}°E`}
                   </strong>
                 </div>
                 <div className="telemetry-item">
                   <span className="telemetry-label">Transit Speed</span>
-                  <strong className="telemetry-value">{speed} km/h</strong>
+                  <strong className="telemetry-value">
+                    {currentStatus === 'Delivered' ? '0 km/h (Parked)' : `${speed} km/h`}
+                  </strong>
                 </div>
                 <div className="telemetry-item">
                   <span className="telemetry-label">Status</span>
-                  <strong className="telemetry-value" style={{ color: 'var(--secondary-color)' }}>
-                    {currentStatus === 'Delivered' ? 'Arrived' : 'En Route'}
+                  <strong className="telemetry-value" style={{ color: currentStatus === 'Delivered' ? '#10b981' : 'var(--secondary-color)' }}>
+                    {currentStatus === 'Delivered' ? 'Delivered 🎉' : (currentStatus === 'Out for Delivery' ? 'En Route' : currentStatus)}
                   </strong>
                 </div>
                 <div className="telemetry-item">
                   <span className="telemetry-label">Trip Progress</span>
-                  <strong className="telemetry-value">{tripProgress}%</strong>
+                  <strong className="telemetry-value" style={currentStatus === 'Delivered' ? { color: '#10b981' } : undefined}>
+                    {currentStatus === 'Delivered' ? '100% (Completed)' : `${tripProgress}%`}
+                  </strong>
                 </div>
               </div>
 
               {/* Delivery Partner Assigned Card */}
               {delivery?.deliveryBoyId && (
                 <div className="partner-assigned-card">
-                  <div className="partner-avatar-circle">
-                    <span>🛵</span>
+                  <div className="partner-avatar-circle" style={currentStatus === 'Delivered' ? { background: '#10b981' } : undefined}>
+                    <span>{currentStatus === 'Delivered' ? '✔' : '🛵'}</span>
                   </div>
                   <div className="partner-details">
-                    <span className="partner-role-tag">DELIVERY VALET</span>
+                    <span
+                      className="partner-role-tag"
+                      style={currentStatus === 'Delivered' ? { background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' } : undefined}
+                    >
+                      {currentStatus === 'Delivered' ? 'DELIVERY COMPLETED' : 'DELIVERY VALET'}
+                    </span>
                     <h4 className="partner-name">{delivery.deliveryBoyId.name || 'FoodFlow Rider'}</h4>
-                    <p className="partner-meta">Verified FoodFlow Partner • 4.9 ★ Rating</p>
+                    <p className="partner-meta">
+                      {currentStatus === 'Delivered'
+                        ? 'Order safely delivered to your doorstep • Thank you!'
+                        : 'Verified FoodFlow Partner • 4.9 ★ Rating'}
+                    </p>
                   </div>
-                  {delivery.deliveryBoyId.phone && (
+                  {currentStatus !== 'Delivered' && delivery.deliveryBoyId.phone && (
                     <a href={`tel:${delivery.deliveryBoyId.phone}`} className="btn-call-partner">
                       <Phone size={15} />
                       <span>Call Valet</span>

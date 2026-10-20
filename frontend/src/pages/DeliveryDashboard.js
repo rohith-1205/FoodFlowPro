@@ -155,8 +155,9 @@ const DeliveryDashboard = () => {
       setTimeout(() => setSuccessMsg(''), 4500);
 
       if (nextStatus === 'Delivered') {
-        // Stop simulation upon delivery
+        // Stop simulation upon delivery and emit final 100% destination arrival ping
         stopSimulation();
+        sendLocationPing(orderId, CUSTOMER_COORDS, 100);
         setActiveDelivery(null);
         setActiveTab('available');
         loadAvailableDeliveries();

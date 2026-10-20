@@ -221,6 +221,8 @@ const updateDeliveryStatus = async (req, res) => {
       delivery.pickedUpAt = new Date();
     } else if (status === 'Delivered') {
       delivery.deliveredAt = new Date();
+      // Ensure GPS telemetry reflects destination arrival
+      delivery.currentCoordinates = { lat: 12.9865, lng: 77.6180 };
     }
     await delivery.save();
 
